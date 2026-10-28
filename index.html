@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QMS Mini Registry</title>
+<style>
+body{margin:0;padding:24px;font-family:Arial,sans-serif;background:#0b1020;color:#f5f7ff}
+main{max-width:520px;margin:40px auto;padding:24px;background:#171f35;border:1px solid #34415e;border-radius:18px}
+h1{color:#75e6cf}
+p{line-height:1.6;color:#cbd5e1}
+input,button{box-sizing:border-box;width:100%;padding:13px;margin-top:12px;border-radius:9px;font-size:16px}
+input{background:#0b1020;color:white;border:1px solid #52617d}
+button{background:#75e6cf;color:#10202a;border:0;font-weight:bold}
+#status,#result{overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<main>
+<h1>QMS Mini Registry</h1>
+<p>A simple on-chain note demo on QMS Testnet.</p>
+<p id="network">Wallet not connected</p>
+<button id="connect">Connect Wallet</button>
+<input id="note" maxlength="280" placeholder="Write a public note">
+<button id="save">Save Note</button>
+<button id="read">Read My Note</button>
+<p id="status">Connect your wallet to begin.</p>
+<p id="result"></p>
+</main>
+<script type="module">
+import { BrowserProvider, Contract } from "https://cdn.jsdelivr.net/npm/ethers@6.13.5/+esm";
+const ADDRESS = "0xA36bcaf5bB4844FE2657d94e66d64B1a328DB0BE";
+const ABI = [
+"function saveNote(string note)",
+"function getMyNote() view returns (string)",
+"function MAX_NOTE_BYTES() view returns (uint256)"
+];
+let contract;
+const status = document.getElementById("status");
+const result = document.getElementById("result");
+
+async function connect(){
+ if(!window.ethereum) throw Error("Open this site in a browser with wallet support.");
+ const provider = new BrowserProvider(window.ethereum);
+ await provider.send("eth_requestAccounts", []);
+ const network = await provider.getNetwork();
+ if(network.chainId !== 19480n) throw Error("Switch wallet to QMS Testnet, Chain ID 19480.");
+ const signer = await provider.getSigner();
+ contract = new Contract(ADDRESS, ABI, signer);
+ document.getElementById("network").textContent = "Connected to QMS Testnet";
+ status.textContent = "Wallet connected.";
+}
+document.getElementById("connect").onclick = async()=>{
+ try{await connect()}catch(e){status.textContent=e.shortMessage||e.message}
+};
+document.getElementById("save").onclick = async()=>{
+ try{
+  if(!contract) await connect();
+  const note=document.getElementById("note").value.trim();
+  if(!note) throw Error("Enter a note first.");
+  if(new TextEncoder().encode(note).length>280) throw Error("Maximum 280 bytes.");
+  status.textContent="Confirm the transaction in your wallet.";
+  const tx=await contract.saveNote(note);
+  await tx.wait();
+  status.textContent="Note saved on QMS Testnet.";
+ }catch(e){status.textContent=e.shortMessage||e.message}
+};
+document.getElementById("read").onclick = async()=>{
+ try{
+  if(!contract) await connect();
+  result.textContent=await contract.getMyNote()||"(No note saved yet.)";
+ }catch(e){result.textContent=e.shortMessage||e.message}
+};
+</script>
+</body>
+</html>
